@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Privacy-first Costco receipt analyzer - analyze your spending patterns entirely in your browser">
+    <title>Costco Receipt Analyzer</title>
+    
+    <!-- External Stylesheet -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Skip link for keyboard users -->
+    <a href="#dashboard-content" class="skip-link">Skip to main content</a>
+    
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <h1 class="app-title">
+                    🛒 Costco Receipt Analyzer
+                    <span class="privacy-badge">
+                        🔒 100% Private
+                    </span>
+                </h1>
+                <div>
+                    <button id="export-btn" class="btn btn-secondary hidden">Export Data</button>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Main Content -->
+        <main class="app-main">
+            <!-- Error Container -->
+            <div id="error-container" class="error-container">
+                <div style="display: flex; align-items: center;">
+                    <div class="error-title">
+                        ⚠️ Error
+                    </div>
+                    <button id="error-close" class="error-close" aria-label="Close error">&times;</button>
+                </div>
+                <p id="error-message" class="error-message"></p>
+            </div>
+            
+            <!-- File Input Section -->
+            <section id="file-input-section" class="file-input-section card">
+                <div class="empty-state">
+                    <div class="empty-state-icon">🧾</div>
+                    <h2 class="empty-state-title">Get Started</h2>
+                    <p class="empty-state-description">
+                        Select your Costco receipt JSON files to analyze your spending patterns. 
+                        All processing happens locally in your browser - your data never leaves your device.
+                    </p>
+                    <div style="margin-top: var(--spacing-xl);">
+                        <div class="file-input-wrapper">
+                            <input 
+                                type="file" 
+                                id="file-input" 
+                                class="file-input" 
+                                accept=".json"
+                                multiple
+                                aria-label="Select receipt JSON files"
+                            >
+                            <label for="file-input" class="file-input-label">
+                                📁 Select Receipt Files
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div id="file-list" class="file-list hidden"></div>
+            </section>
+            
+            <!-- Dashboard Content (hidden until data is loaded) -->
+            <div id="dashboard-content" class="hidden">
+                <!-- Tabs Navigation (7 tabs per FR3) -->
+                <div class="tabs-nav" role="tablist" aria-label="Analytics sections">
+                    <button class="tab-btn active" data-tab="overview" role="tab" aria-selected="true" aria-controls="tab-overview">📊 Overview</button>
+                    <button class="tab-btn" data-tab="trends" role="tab" aria-selected="false" aria-controls="tab-trends">📈 Trends</button>
+                    <button class="tab-btn" data-tab="items" role="tab" aria-selected="false" aria-controls="tab-items">🏷️ Items & Prices</button>
+                    <button class="tab-btn" data-tab="categories" role="tab" aria-selected="false" aria-controls="tab-categories">📦 Categories</button>
+                    <button class="tab-btn" data-tab="trips" role="tab" aria-selected="false" aria-controls="tab-trips">🏪 Trips & Warehouses</button>
+                    <button class="tab-btn" data-tab="gas" role="tab" aria-selected="false" aria-controls="tab-gas">⛽ Gas</button>
+                    <button class="tab-btn" data-tab="taxes" role="tab" aria-selected="false" aria-controls="tab-taxes">💰 Taxes & Rewards</button>
+                </div>
+
+                <!-- Filter Controls -->
+                <section class="filter-controls">
+                    <div class="filter-group">
+                        <label class="filter-label" for="date-preset">Date Range</label>
+                        <select id="date-preset" class="filter-select">
+                            <option value="all" selected>All Time</option>
+                            <option value="ytd">Year to Date</option>
+                            <option value="last12">Last 12 Months</option>
+                            <option value="custom">Custom Range</option>
+                        </select>
+                    </div>
+                    <div class="filter-group" id="date-start-group" style="display: none;">
+                        <label class="filter-label" for="date-start">Start Date</label>
+                        <input type="date" id="date-start" class="filter-input">
+                    </div>
+                    <div class="filter-group" id="date-end-group" style="display: none;">
+                        <label class="filter-label" for="date-end">End Date</label>
+                        <input type="date" id="date-end" class="filter-input">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" for="channel-filter">Purchase Type</label>
+                        <select id="channel-filter" class="filter-select">
+                            <option value="all">All Purchases</option>
+                            <option value="warehouse">Warehouse Only</option>
+                            <option value="online">Online Only</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" for="warehouse-filter">Warehouse</label>
+                        <select id="warehouse-filter" class="filter-select">
+                            <option value="all">All Warehouses</option>
+                        </select>
+                    </div>
+                    <div class="filter-group" id="membership-filter-group">
+                        <label class="filter-label" for="membership-filter">Member</label>
+                        <select id="membership-filter" class="filter-select">
+                            <option value="all">All Members</option>
+                        </select>
+                    </div>
+                    <button id="clear-filters-btn" class="btn btn-secondary" style="margin-top: auto;">
+                        Clear Filters
+                    </button>
+                </section>
+                
+                <!-- ==================== TAB: OVERVIEW ==================== -->
+                <div id="tab-overview" class="tab-content active" role="tabpanel" aria-labelledby="tab-btn-overview">
+                    <!-- Statistics & Insights Header -->
+                    <div style="text-align: center; margin-bottom: 2rem;">
+                        <h2 style="font-size: 2rem; margin: 0 0 0.5rem 0; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <span style="font-size: 2.5rem;">📊</span> Statistics & Insights
+                        </h2>
+                        <p style="margin: 0; color: var(--color-text-secondary); font-size: 1rem;">
+                            Quick pulse on spending, activity, and returns
+                        </p>
+                    </div>
+                    
+                    <div class="overview-sections">
+                        <!-- Spending -->
+                        <section class="overview-section">
+                            <div class="overview-section-header">
+                                <div>
+                                    <h3 class="overview-section-title">Spending</h3>
+                                    <p class="overview-section-subtitle">Net unless noted</p>
+                                </div>
+                            </div>
+                            <div class="stats-grid stats-grid-compact">
+                                <div class="stat-card" style="border-left: 4px solid #10b981;" title="Net Spent: Total purchases minus refunds&#10;Gross: Total purchases before refunds">
+                                    <div class="stat-label">💰 Net Spend</div>
+                                    <div class="stat-value" id="stat-total-spent" style="color: #10b981;">$0.00</div>
+                                    <div class="stat-sublabel" id="stat-gross-spent">$0.00 gross</div>
+                                </div>
+                                <div class="stat-card" style="border-left: 4px solid #ef4444;" title="Average spending per receipt (Net spending ÷ Total receipts)">
+                                    <div class="stat-label">🎯 Avg per Receipt</div>
+                                    <div class="stat-value" id="stat-avg-visit" style="color: #ef4444;">$0.00</div>
+                                    <div class="stat-sublabel">per receipt</div>
+                                </div>
+                                <div class="stat-card" style="border-left: 4px solid #f59e0b;" title="Average price per item unit (Total gross spending ÷ Total items purchased)">
+                                    <div class="stat-label">📊 Avg per Item</div>
+                                    <div class="stat-value" id="stat-avg-purchase" style="color: #f59e0b;">$0.00</div>
+                                    <div class="stat-sublabel">unit price</div>
+                                </div>
+                                <div class="stat-card" style="border-left: 4px solid #22c55e;" title="Total instant savings and discounts applied at checkout">
+                                    <div class="stat-label">💵 Total Savings</div>
+                                    <div class="stat-value" id="stat-total-savings" style="color: #22c55e;">$0.00</div>
+                                    <div class="stat-sublabel">instant savings</div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Activity -->
+                        <section class="overview-section">
+                            <div class="overview-section-header">
+                                <div>
+                                    <h3 class="overview-section-title">Activity</h3>
+                                    <p class="overview-section-subtitle">Receipts, items, and basket size</p>
+                                </div>
+                            </div>
+                            <div class="stats-grid stats-grid-compact">
+                                <div class="stat-card" style="border-left: 4px solid #06b6d4;" title="Total receipt count, split by warehouse visits and online orders">
+                                    <div class="stat-label">🧾 Receipts</div>
+                                    <div class="stat-value" id="stat-total-visits" style="color: #06b6d4;">0</div>
+                                    <div class="stat-sublabel" id="stat-visits-breakdown">0 warehouse · 0 online</div>
+                                </div>
+                                <div class="stat-card" style="border-left: 4px solid #3b82f6;" title="Total quantity of all items purchased (sum of item quantities across all shopping trips)">
+                                    <div class="stat-label">🛒 Items Bought</div>
+                                    <div class="stat-value" id="stat-total-purchase" style="color: #3b82f6;">0</div>
+                                    <div class="stat-sublabel">units purchased</div>
+                                </div>
+                                <div class="stat-card" style="border-left: 4px solid #8b5cf6;" title="Unique: Different product SKUs ever purchased&#10;Net: Products with positive quantity after returns (excludes fully returned items)">
+                                    <div class="stat-label">📦 Unique Items</div>
+                                    <div class="stat-value" id="stat-unique-items" style="color: #8b5cf6;">0</div>
+                                    <div class="stat-sublabel" id="stat-net-unique">0 net items</div>
+                                </div>
+                                <div class="stat-card" style="border-left: 4px solid #0ea5e9;" title="Average item count per receipt (total items ÷ receipts)">
+                                    <div class="stat-label">🧺 Basket Size</div>
+                                    <div class="stat-value" id="stat-items-per-receipt" style="color: #0ea5e9;">0</div>
+                                    <div class="stat-sublabel" id="stat-items-per-receipt-note">items per receipt</div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Returns & Tax -->
+                        <section class="overview-section">
+                            <div class="overview-section-header">
+                                <div>
+                                    <h3 class="overview-section-title">Returns & Tax</h3>
+                                    <p class="overview-section-subtitle">Refunds, rate, and tax burden</p>
+                                </div>
+                            </div>
+                            <div class="stats-grid stats-grid-compact">
+                                <div class="stat-card" style="border-left: 4px solid #7c3aed;" title="Transactions: Number of refund receipts&#10;Amount: Total dollar value returned&#10;Items: Total quantity of items returned&#10;Unique: Different products returned">
+                                    <div class="stat-label">💜 Refunds</div>
+                                    <div class="stat-value" id="stat-refunds" style="color: #7c3aed;">0</div>
+                                    <div class="stat-sublabel" id="stat-refund-amount">$0.00 · 0 items · 0 unique</div>
+                                </div>
+                                <div class="stat-card" style="border-left: 4px solid #d946ef;" title="Share of receipts that include refunds">
+                                    <div class="stat-label">↩️ Return Rate</div>
+                                    <div class="stat-value" id="stat-return-rate" style="color: #d946ef;">0%</div>
+                                    <div class="stat-sublabel" id="stat-return-rate-note">of receipts</div>
+                                </div>
+                                <div class="stat-card" style="border-left: 4px solid #7c3aed;" title="Overall tax rate across all purchases (Total taxes ÷ Total spending)">
+                                    <div class="stat-label">📊 Effective Tax Rate</div>
+                                    <div class="stat-value" id="tax-rate-overview" style="color: #7c3aed;">0%</div>
+                                    <div class="stat-sublabel">of total spending</div>
+                                </div>
+                                <div class="stat-card" style="border-left: 4px solid #dc2626;" title="Cumulative sales tax paid across all purchases">
+                                    <div class="stat-label">💵 Total Tax Paid</div>
+                                    <div class="stat-value" id="total-tax-overview" style="color: #dc2626;">$0.00</div>
+                                    <div class="stat-sublabel">after all returns</div>
+                                </div>
+                                <div class="stat-card" style="border-left: 4px solid #16a34a;" title="Largest single instant savings amount on any item">
+                                    <div class="stat-label">💎 Best Discount</div>
+                                    <div class="stat-value" id="best-discount-overview" style="color: #16a34a;">$0.00</div>
+                                    <div class="stat-sublabel" id="best-discount-item-overview">—</div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Rewards -->
+                        <section class="overview-section">
+                            <div class="overview-section-header">
+                                <div>
+                                    <h3 class="overview-section-title">Rewards</h3>
+                                    <p class="overview-section-subtitle">Executive 2% (see Taxes & Rewards for full tracker)</p>
+                                </div>
+                            </div>
+                            <div class="stats-grid stats-grid-compact">
+                                <div class="stat-card" style="border-left: 4px solid #d97706;" title="Estimated 2% cashback on eligible warehouse merchandise (excludes gas, food court, alcohol, tobacco, and some other categories)">
+                                    <div class="stat-label">🏆 Est. Executive Reward</div>
+                                    <div class="stat-value" id="stat-exec-reward" style="color: #d97706;">$0.00</div>
+                                    <div class="stat-sublabel">2% of qualifying spend</div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Gas Snapshot -->
+                        <section class="overview-section">
+                            <div class="overview-section-header">
+                                <div>
+                                    <h3 class="overview-section-title">Gas Snapshot</h3>
+                                    <p class="overview-section-subtitle">High level; drill into Gas tab for trends</p>
+                                </div>
+                            </div>
+                            <div class="stats-grid stats-grid-compact">
+                                <div class="stat-card" style="border-left: 4px solid #f59e0b;">
+                                    <div class="stat-label">⛽ Total Gas Spent</div>
+                                    <div class="stat-value" id="gas-total-spent-overview" style="color: #f59e0b;">$0.00</div>
+                                    <div class="stat-sublabel">all grades</div>
+                                </div>
+                                <div class="stat-card" style="border-left: 4px solid #3b82f6;">
+                                    <div class="stat-label">🛢️ Total Gallons</div>
+                                    <div class="stat-value" id="gas-total-gallons-overview" style="color: #3b82f6;">0.0 gal</div>
+                                    <div class="stat-sublabel">lifetime</div>
+                                </div>
+                                <div class="stat-card" style="border-left: 4px solid #10b981;">
+                                    <div class="stat-label">💵 Avg Price/Gal</div>
+                                    <div class="stat-value" id="gas-avg-price-overview" style="color: #10b981;">$0.00</div>
+                                    <div class="stat-sublabel">weighted average</div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+                
+                <!-- ==================== TAB: TRENDS ==================== -->
+                <div id="tab-trends" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-trends">
+                    <div class="dashboard-grid">
+                        <!-- Spending Trend Chart -->
+                        <div class="card chart-full-width">
+                            <div class="card-header">
+                                <h3 class="card-title">📈 Monthly Spending Trend</h3>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin-bottom: 1rem;">Net spend by month over time</p>
+                                <div id="spending-trend-chart" class="chart-container"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Savings Analysis Chart -->
+                        <div class="card chart-full-width">
+                            <div class="card-header">
+                                <h3 class="card-title">💵 Savings Over Time</h3>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin-bottom: 1rem;">Instant savings by month</p>
+                                <div id="savings-chart" class="chart-container"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Purchase Calendar Heatmap -->
+                        <div class="card chart-full-width">
+                            <div class="card-header">
+                                <h3 class="card-title">📅 Purchase Calendar</h3>
+                            </div>
+                            <div class="card-body">
+                                <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 0.75rem; flex-wrap: wrap;">
+                                    <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin: 0;">Shopping activity over time</p>
+                                    <label for="calendar-metric" style="font-size: 0.8rem; color: var(--color-text-secondary); display: flex; align-items: center; gap: 0.4rem; margin: 0;">
+                                        Metric:
+                                        <select id="calendar-metric" class="filter-select" style="padding: 0.25rem 0.5rem; font-size: 0.85rem; min-width: 140px;">
+                                            <option value="visits" selected>Visits (trips)</option>
+                                            <option value="spend">Amount Spent</option>
+                                            <option value="items">Items Purchased</option>
+                                        </select>
+                                    </label>
+                                </div>
+                                <div id="calendar-heatmap" class="chart-container"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Shopping Behavior Section - Full Width -->
+                        <div class="card chart-full-width">
+                            <div class="card-header">
+                                <h3 class="card-title">🛒 Shopping Behavior</h3>
+                            </div>
+                            <div class="card-body">
+                                <div style="display: grid; grid-template-columns: 200px 1fr; gap: 2rem; align-items: start;">
+                                    <!-- Shopping Frequency Stat -->
+                                    <div class="stat-card" style="border-left: 4px solid #2563eb;" title="Average number of shopping trips per month">
+                                        <div class="stat-label">Shopping Frequency</div>
+                                        <div class="stat-value" id="shopping-frequency" style="color: #2563eb;">0</div>
+                                        <div class="stat-sublabel">trips per month</div>
+                                    </div>
+                                    
+                                    <!-- Favorite Shopping Days -->
+                                    <div>
+                                        <h4 style="margin: 0 0 1rem 0; font-size: 0.95rem; color: var(--color-text-primary);">📅 Favorite Shopping Days</h4>
+                                        <p style="margin: 0 0 1rem 0; font-size: 0.8rem; color: var(--color-text-secondary);">Which days you shop most</p>
+                                        <div id="shopping-days-chart"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ==================== TAB: ITEMS & PRICES ==================== -->
+                <div id="tab-items" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-items">
+                    <div class="dashboard-grid">
+                        <!-- Top Items by Spending Chart - Full Width -->
+                        <div class="card chart-full-width">
+                            <div class="card-header">
+                                <h3 class="card-title">💰 Top 10 Items by Spending</h3>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin-bottom: 1rem;">Your highest cumulative spend items</p>
+                                <div id="top-items-chart" class="chart-container"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Price Evolution Chart - Full Width -->
+                        <div class="card chart-full-width">
+                            <div class="card-header">
+                                <h3 class="card-title">📊 Price Evolution</h3>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin-bottom: 1rem;">Track price changes for your most frequently purchased items</p>
+                                <div id="price-evolution-chart" class="chart-container"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Most Frequently Purchased Items - Full Width -->
+                        <div class="card chart-full-width">
+                            <div class="card-header">
+                                <h3 class="card-title">🔄 Most Frequently Purchased</h3>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin-bottom: 1rem;">Items you buy most often</p>
+                                <div style="overflow-x: auto;">
+                                    <table style="width: 100%; font-size: 0.85rem;">
+                                        <thead style="background: var(--color-surface-elevated); border-bottom: 2px solid var(--color-border);">
+                                            <tr>
+                                                <th style="padding: 0.5rem; text-align: left;">Item</th>
+                                                <th style="padding: 0.5rem; text-align: right;">Purchases</th>
+                                                <th style="padding: 0.5rem; text-align: right;">Avg Price</th>
+                                                <th style="padding: 0.5rem; text-align: right;">Min</th>
+                                                <th style="padding: 0.5rem; text-align: right;">Max</th>
+                                                <th style="padding: 0.5rem; text-align: right;">Repurchase</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="frequent-items-table-body"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Price Tracking Section -->
+                        <section id="price-tracking-section" class="chart-full-width" style="display: block;">
+                            <!-- Full-width Top Spend -->
+                            <div class="card" style="border-top: 3px solid #d97706; margin-bottom: 1.5rem;">
+                                <h3 style="margin: 0 0 0.5rem 0; font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+                                    💰 Top 10 by Total Spend
+                                </h3>
+                                <p style="margin: 0 0 1rem 0; font-size: 0.8rem; color: var(--color-text-secondary);">
+                                    Your highest cumulative spend items
+                                </p>
+                                <div style="overflow-x: auto;">
+                                    <table style="width: 100%; font-size: 0.85rem;">
+                                        <thead style="background: var(--color-surface-elevated); border-bottom: 2px solid var(--color-border);">
+                                            <tr>
+                                                <th style="padding: 0.5rem; text-align: left;">Item</th>
+                                                <th style="padding: 0.5rem; text-align: right;">Total Spent</th>
+                                                <th style="padding: 0.5rem; text-align: right;">Avg Price</th>
+                                                <th style="padding: 0.5rem; text-align: right;">Purchases</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="top-spending-table-body"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <!-- Two-column grid for price changes -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem;">
+                                <!-- Price Increases -->
+                                <div class="card" style="border-top: 3px solid #dc2626;">
+                                    <h3 style="margin: 0 0 0.5rem 0; font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+                                        📈 Price Increases
+                                    </h3>
+                                    <p style="margin: 0 0 1rem 0; font-size: 0.8rem; color: var(--color-text-secondary);">
+                                        Latest price > First price recorded
+                                    </p>
+                                    <div style="overflow-x: auto;">
+                                        <table style="width: 100%; font-size: 0.85rem;">
+                                            <thead style="background: var(--color-surface-elevated); border-bottom: 2px solid var(--color-border);">
+                                                <tr>
+                                                    <th style="padding: 0.5rem; text-align: left;">Item</th>
+                                                    <th style="padding: 0.5rem; text-align: right;">Old → New</th>
+                                                    <th style="padding: 0.5rem; text-align: right;">Diff</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="price-increase-body"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                
+                                <!-- Price Drops -->
+                                <div class="card" style="border-top: 3px solid #16a34a;">
+                                    <h3 style="margin: 0 0 0.5rem 0; font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+                                        📉 Price Drops
+                                    </h3>
+                                    <p style="margin: 0 0 1rem 0; font-size: 0.8rem; color: var(--color-text-secondary);">
+                                        Latest price < First price recorded
+                                    </p>
+                                    <div style="overflow-x: auto;">
+                                        <table style="width: 100%; font-size: 0.85rem;">
+                                            <thead style="background: var(--color-surface-elevated); border-bottom: 2px solid var(--color-border);">
+                                                <tr>
+                                                    <th style="padding: 0.5rem; text-align: left;">Item</th>
+                                                    <th style="padding: 0.5rem; text-align: right;">Old → New</th>
+                                                    <th style="padding: 0.5rem; text-align: right;">Diff</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="price-decrease-body"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+                
+                <!-- ==================== TAB: CATEGORIES ==================== -->
+                <div id="tab-categories" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-categories">
+                    <div class="dashboard-grid">
+                        <!-- Category Breakdown Chart -->
+                        <div class="card chart-full-width">
+                            <div class="card-header">
+                                <h3 class="card-title">📦 Category Breakdown</h3>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin-bottom: 1rem;">Spending distribution by department</p>
+                                <div id="category-chart" class="chart-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ==================== TAB: TRIPS & WAREHOUSES ==================== -->
+                <div id="tab-trips" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-trips">
+                    <!-- Warehouse Stats Grid -->
+                    <div class="stats-grid" id="warehouse-stats-grid">
+                        <div class="stat-card" style="border-left: 4px solid #2563eb;">
+                            <div class="stat-label">🏪 Unique Warehouses</div>
+                            <div class="stat-value" id="unique-warehouses" style="color: #2563eb;">0</div>
+                            <div class="stat-sublabel">locations visited</div>
+                        </div>
+                        <div class="stat-card" style="border-left: 4px solid #10b981;">
+                            <div class="stat-label">🛒 Warehouse Trips</div>
+                            <div class="stat-value" id="warehouse-trips" style="color: #10b981;">0</div>
+                            <div class="stat-sublabel">unique visit days</div>
+                        </div>
+                        <div class="stat-card" style="border-left: 4px solid #8b5cf6;">
+                            <div class="stat-label">📦 Online Orders</div>
+                            <div class="stat-value" id="online-orders" style="color: #8b5cf6;">0</div>
+                            <div class="stat-sublabel">delivery/pickup</div>
+                        </div>
+                        <div class="stat-card" style="border-left: 4px solid #f59e0b;">
+                            <div class="stat-label">⭐ Most Visited</div>
+                            <div class="stat-value" id="most-visited-warehouse" style="color: #f59e0b; font-size: 1rem;">—</div>
+                            <div class="stat-sublabel" id="most-visited-count">0 visits</div>
+                        </div>
+                    </div>
+                    
+                    <div class="dashboard-grid">
+                        <!-- Warehouse Comparison Chart -->
+                        <div class="card chart-full-width">
+                            <div class="card-header" style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+                                <h3 class="card-title">🏪 Warehouse Comparison</h3>
+                                <label style="display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--color-text-secondary);">
+                                    <input type="checkbox" id="warehouse-include-online" />
+                                    Include Online
+                                </label>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin-bottom: 0.75rem;">
+                                    Spending by warehouse location. Trips = unique in-store visit days (gas excluded). Receipts = total receipts.
+                                </p>
+                                <div id="warehouse-chart" class="chart-container"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Warehouse Details Table -->
+                        <div class="card chart-full-width">
+                            <div class="card-header">
+                                <h3 class="card-title">🗂️ Warehouse Details</h3>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.85rem; color: var(--color-text-secondary); margin-bottom: 0.75rem;">
+                                    Trips = unique visit days. Receipts = total receipts. Online rows are optional (toggle above).
+                                </p>
+                                <div style="overflow-x: auto;">
+                                    <table style="width: 100%; font-size: 0.85rem; border-collapse: collapse;">
+                                        <thead style="background: var(--color-surface-elevated); border-bottom: 2px solid var(--color-border);">
+                                            <tr>
+                                                <th style="padding: 0.5rem; text-align: left;">Warehouse</th>
+                                                <th style="padding: 0.5rem; text-align: right;">Trips</th>
+                                                <th style="padding: 0.5rem; text-align: right;">Receipts</th>
+                                                <th style="padding: 0.5rem; text-align: right;">Total Spent</th>
+                                                <th style="padding: 0.5rem; text-align: right;">Avg/Trip</th>
+                                                <th style="padding: 0.5rem; text-align: right;">Last Visit</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="warehouse-table-body"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ==================== TAB: GAS ==================== -->
+                <div id="tab-gas" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-gas">
+                    <!-- Gas Hero Stats -->
+                    <div class="stats-grid" id="gas-stats-grid">
+                        <div class="stat-card" style="border-left: 4px solid #f59e0b;">
+                            <div class="stat-label">⛽ Total Gas Spent</div>
+                            <div class="stat-value" id="gas-total-spent" style="color: #f59e0b;">$0.00</div>
+                            <div class="stat-sublabel" id="gas-total-spent-change">—</div>
+                        </div>
+                        <div class="stat-card" style="border-left: 4px solid #3b82f6;">
+                            <div class="stat-label">🛢️ Total Gallons</div>
+                            <div class="stat-value" id="gas-total-gallons" style="color: #3b82f6;">0.0 gal</div>
+                            <div class="stat-sublabel" id="gas-total-gallons-change">—</div>
+                        </div>
+                        <div class="stat-card" style="border-left: 4px solid #10b981;">
+                            <div class="stat-label">💵 Avg Price/Gal <span style="background:#ecfdf3;border-radius:999px;padding:2px 8px;font-size:0.75rem;color:#15803d;">Weighted avg</span></div>
+                            <div class="stat-value" id="gas-avg-price" style="color: #10b981;">$0.00</div>
+                            <div class="stat-sublabel" id="gas-avg-price-change">—</div>
+                        </div>
+                        <div class="stat-card" style="border-left: 4px solid #8b5cf6;">
+                            <div class="stat-label">🚗 Gas Visits</div>
+                            <div class="stat-value" id="gas-visits" style="color: #8b5cf6;">0</div>
+                            <div class="stat-sublabel" id="gas-visits-change">—</div>
+                        </div>
+                        <div class="stat-card" style="border-left: 4px solid #ec4899;">
+                            <div class="stat-label">📍 Gas Locations</div>
+                            <div class="stat-value" id="gas-locations" style="color: #ec4899;">0</div>
+                            <div class="stat-sublabel" id="gas-locations-change">Unique Stations</div>
+                        </div>
+                    </div>
+                    
+                    <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));">
+                        <!-- Gas Price History Chart -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">📈 Price Per Gallon (by grade)</h3>
+                            </div>
+                            <div class="card-body">
+                                <p id="gas-price-subtitle" style="font-size: 0.875rem; color: var(--color-text-secondary); margin-bottom: 1rem;">Toggle grades to compare trends</p>
+                                <div id="gas-price-history-chart" class="chart-container"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Gas Spending Chart -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">💰 Monthly Gas Spending (stacked by station)</h3>
+                            </div>
+                            <div class="card-body">
+                                <p id="gas-spend-subtitle" style="font-size: 0.875rem; color: var(--color-text-secondary); margin-bottom: 1rem;">See which stations drive spend</p>
+                                <div id="gas-spending-chart" class="chart-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));">
+                        <!-- Recent Fill-ups -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">🧾 Recent Fill-ups</h3>
+                            </div>
+                            <div class="card-body">
+                                <div style="overflow-x: auto;">
+                                    <table style="width: 100%; font-size: 0.85rem; border-collapse: collapse;">
+                                        <thead style="background: var(--color-surface-elevated); border-bottom: 2px solid var(--color-border);">
+                                            <tr>
+                                                <th style="padding: 0.5rem; text-align: left;">Date</th>
+                                                <th style="padding: 0.5rem; text-align: left;">Warehouse</th>
+                                                <th style="padding: 0.5rem; text-align: left;">Grade</th>
+                                                <th style="padding: 0.5rem; text-align: right;">Gallons</th>
+                                                <th style="padding: 0.5rem; text-align: right;">$/gal</th>
+                                                <th style="padding: 0.5rem; text-align: right;">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="gas-recent-fillups-body"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Location Averages -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">📍 Location Averages</h3>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.8rem; color: var(--color-text-secondary); margin-bottom: 0.75rem;">Top stations by visits with avg $/gal and gallons</p>
+                                <div style="overflow-x: auto;">
+                                    <table style="width: 100%; font-size: 0.85rem; border-collapse: collapse;">
+                                        <thead style="background: var(--color-surface-elevated); border-bottom: 2px solid var(--color-border);">
+                                            <tr>
+                                                <th style="padding: 0.5rem; text-align: left;">Station</th>
+                                                <th style="padding: 0.5rem; text-align: right;">Avg $/gal</th>
+                                                <th style="padding: 0.5rem; text-align: right;">Gallons</th>
+                                                <th style="padding: 0.5rem; text-align: right;">Visits</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="gas-location-avg-body"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ==================== TAB: TAXES & REWARDS ==================== -->
+                <div id="tab-taxes" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-taxes">
+                    <!-- Tax & Savings KPI Stats -->
+                    <div class="stats-grid">
+                        <div class="stat-card stat-accent-purple" title="Overall tax rate across all purchases (Total taxes ÷ Total spending)">
+                            <div class="stat-label">📊 Effective Tax Rate</div>
+                            <div class="stat-value" id="tax-rate">0%</div>
+                            <div class="stat-sublabel">of total spending</div>
+                        </div>
+                        <div class="stat-card stat-accent-red" title="Cumulative sales tax paid across all purchases">
+                            <div class="stat-label">💵 Total Tax Paid</div>
+                            <div class="stat-value" id="total-tax">$0.00</div>
+                            <div class="stat-sublabel">after all returns</div>
+                        </div>
+                        <div class="stat-card stat-accent-green" title="Total instant savings and discounts across all purchases">
+                            <div class="stat-label">💰 Total Savings</div>
+                            <div class="stat-value" id="total-savings-stat">$0.00</div>
+                            <div class="stat-sublabel">instant discounts</div>
+                        </div>
+                        <div class="stat-card stat-accent-emerald" title="Largest single instant savings amount on any item">
+                            <div class="stat-label">💎 Best Discount</div>
+                            <div class="stat-value" id="best-discount">$0.00</div>
+                            <div class="stat-sublabel" id="best-discount-item">—</div>
+                        </div>
+                        <div class="stat-card stat-accent-sky" title="Average tax paid per receipt (net of refunds)">
+                            <div class="stat-label">🧾 Avg Tax / Receipt</div>
+                            <div class="stat-value" id="avg-tax-per-receipt">$0.00</div>
+                            <div class="stat-sublabel">net of refunds</div>
+                        </div>
+                    </div>
+                    <div class="taxes-layout">
+                        <div class="taxes-column">
+                            <section class="card card-accent-purple">
+                                <div class="card-header">
+                                    <div>
+                                        <h3 class="card-title">💵 Tax Trend & Mix</h3>
+                                        <p class="card-subtitle">Net of refunds; monthly effective rate and tax dollars</p>
+                                    </div>
+                                    <span class="pill pill-muted" id="taxes-scope-label">All channels</span>
+                                </div>
+                                <div class="card-body">
+                                    <div id="tax-rate-chart" class="chart-container chart-compact"></div>
+                                    <div class="top-list" id="tax-top-list"></div>
+                                </div>
+                            </section>
+                            
+                            <section class="card" id="tax-by-dept-card">
+                                <div class="card-header">
+                                    <div>
+                                        <h3 class="card-title">🏷️ Tax by Department</h3>
+                                        <p class="card-subtitle">Top departments by tax dollars, with share of total</p>
+                                    </div>
+                                    <span class="pill pill-purple">Top 10</span>
+                                </div>
+                                <div class="table-wrapper">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Department</th>
+                                                <th>Warehouse</th>
+                                                <th class="num">Tax</th>
+                                                <th class="num">Rate</th>
+                                                <th class="num">Share</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="tax-by-dept-body"></tbody>
+                                    </table>
+                                </div>
+                                <p class="table-footnote" id="tax-table-footnote">Showing top 10 departments by tax dollars.</p>
+                            </section>
+                        </div>
+                        
+                        <div class="taxes-column">
+                            <section class="card card-accent-amber" id="rewards-section">
+                                <div class="card-header">
+                                    <div>
+                                        <h3 class="card-title">🏆 Executive Membership 2% Reward Tracker</h3>
+                                        <p class="card-subtitle">Default: calendar year. Override with your membership renewal date.</p>
+                                    </div>
+                                    <div class="cycle-control">
+                                        <label for="reward-cycle-start" class="sr-only">Reward cycle start date</label>
+                                        <div class="cycle-input">
+                                            <input type="date" id="reward-cycle-start" aria-label="Set rewards cycle start date">
+                                            <button type="button" id="reset-reward-cycle" class="btn btn-secondary btn-sm">Reset</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="rewards-progress">
+                                    <div class="progress-bar">
+                                        <div id="reward-progress-bar"></div>
+                                    </div>
+                                    <div class="progress-meta">
+                                        <span id="reward-progress-label">0% of $1,250 cap</span>
+                                        <span id="reward-progress-cap">Cap remaining: $1,250.00</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="reward-stats">
+                                    <div class="mini-stat">
+                                        <div class="mini-stat-label">Qualifying Spend</div>
+                                        <div class="mini-stat-value" id="reward-qualifying-spend">$0.00</div>
+                                    </div>
+                                    <div class="mini-stat">
+                                        <div class="mini-stat-label">Projected 2%</div>
+                                        <div class="mini-stat-value" id="reward-projected">$0.00</div>
+                                    </div>
+                                    <div class="mini-stat">
+                                        <div class="mini-stat-label">Cap Remaining</div>
+                                        <div class="mini-stat-value" id="reward-cap-remaining">$1,250.00</div>
+                                    </div>
+                                </div>
+                                
+                                <p class="card-subtitle small">Excludes gas, pharmacy, gift cards, and travel; net of refunds.</p>
+                                
+                                <div class="table-wrapper">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Cycle Year</th>
+                                                <th class="num">Qualifying Spend</th>
+                                                <th class="num">2% Cashback</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="rewards-table-body"></tbody>
+                                    </table>
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+                </div>
+                
+            </div> <!-- Closes dashboard-content -->
+        </main>
+        
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="loading-overlay" role="alert" aria-live="assertive">
+            <div class="loading-spinner" aria-hidden="true"></div>
+            <div class="loading-text" id="loading-text">Processing files...</div>
+        </div>
+        
+        <!-- Screen reader announcements for dynamic updates -->
+        <div id="sr-announcements" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+    </div>
+    
+    <!-- D3.js Library (CDN) -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    
+    <!-- Application JavaScript (loaded in order, classic scripts) -->
+    <script src="js/modules.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/ui-controller.js"></script>
+    <script src="js/init.js"></script>
+</body>
+</html>
